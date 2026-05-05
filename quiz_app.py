@@ -24,7 +24,7 @@ def save_data(df):
 # ---------------------------
 # Title
 # ---------------------------
-st.title("🧬 Microbiology & Metagenomics Challenge for ACG Member")
+st.title("🧬 Microbiology & Metagenomics Challenge for AGC Member")
 st.write("Answer all questions. Highest score + fastest time wins! 🏆")
 
 # ---------------------------
@@ -140,3 +140,4 @@ if not df.empty:
     st.dataframe(df_sorted.head(10))
 else:
     st.write("No results yet.")
+st.subheader(" cc by MK Biswas")
