@@ -149,8 +149,9 @@ col1, col2, col3 = st.columns([1,2,1])
 with col2:
     st.markdown(
         "<div style='text-align: center; font-size: 14px;'>"
-        "Developed by <b>MK Biswas</b> 🧬<br>"
-        "Biology Quiz Platform"
+        "🧬 Biology Quiz Platform <br> Developed by <b>Manosh Biswas, PhD</b> <br> Assistant Professor<br>Computational Biology Lab <br> AGC UM6P "
         "</div>",
         unsafe_allow_html=True
     )
+
+ 
