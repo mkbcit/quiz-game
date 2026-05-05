@@ -24,7 +24,7 @@ def save_data(df):
 # ---------------------------
 # Title
 # ---------------------------
-st.title("🧬 Microbiology & Metagenomics Challenge for AGC Member")
+st.title("🧬 Genomics & Metagenomics Challenge for AGC Member")
 st.write("Answer all questions. Highest score + fastest time wins! 🏆")
 
 # ---------------------------
