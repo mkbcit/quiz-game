@@ -1,19 +1,15 @@
 import streamlit as st
 import pandas as pd
 import time
-from datetime import datetime
 
 # ---------------------------
-# Initialize session state
+# Session state
 # ---------------------------
 if "start_time" not in st.session_state:
     st.session_state.start_time = None
 if "submitted" not in st.session_state:
     st.session_state.submitted = False
 
-# ---------------------------
-# Load leaderboard file
-# ---------------------------
 FILE = "results.csv"
 
 def load_data():
@@ -26,13 +22,13 @@ def save_data(df):
     df.to_csv(FILE, index=False)
 
 # ---------------------------
-# UI Title
+# Title
 # ---------------------------
-st.title("🧬 Microbiology Quiz Challenge")
-st.write("Answer all questions as fast as possible. Top score + fastest time wins! 🏆")
+st.title("🧬 Microbiology & Metagenomics Challenge")
+st.write("Answer all questions. Highest score + fastest time wins! 🏆")
 
 # ---------------------------
-# Name Input
+# Name input
 # ---------------------------
 name = st.text_input("Enter your Name / ID")
 
@@ -45,26 +41,83 @@ if st.button("Start Quiz 🚀") and name:
 # ---------------------------
 if st.session_state.start_time and not st.session_state.submitted:
 
-    st.subheader("Answer the questions:")
+    st.subheader("Answer all questions:")
 
-    q1 = st.radio("1. DNA carries genetic information?", ["RNA", "DNA", "Protein"])
-    q2 = st.radio("2. PCR is used to:", ["Amplify DNA", "Cut DNA", "Store DNA"])
-    q3 = st.radio("3. CRISPR is used for:", ["Gene editing", "Sequencing", "Extraction"])
-    q4 = st.radio("4. Microbiome means:", ["Single microbe", "All microbes", "Only pathogens"])
-    q5 = st.radio("5. ATP is:", ["Energy molecule", "Protein", "DNA"])
-    
+    answers = {}
+
+    answers["q1"] = st.radio("1. Which molecule carries genetic information?",
+                            ["RNA", "DNA", "Protein", "Lipid"])
+
+    answers["q2"] = st.radio("2. PCR is used to:",
+                            ["Sequence DNA", "Amplify DNA", "Cut DNA", "Store DNA"])
+
+    answers["q3"] = st.radio("3. CRISPR-Cas9 is used for:",
+                            ["DNA extraction", "Gene editing", "Protein synthesis", "Sequencing"])
+
+    answers["q4"] = st.radio("4. Natural products are produced by:",
+                            ["Only synthetic processes", "Living organisms", "Only plants", "Only bacteria"])
+
+    answers["q5"] = st.radio("5. Fermentation is used to:",
+                            ["Produce useful products using microbes", "Destroy DNA", "Sequence proteins", "Measure pH"])
+
+    answers["q6"] = st.radio("6. Which RNA carries amino acids?",
+                            ["mRNA", "tRNA", "rRNA", "snRNA"])
+
+    answers["q7"] = st.radio("7. Metagenomics studies:",
+                            ["Single organisms", "DNA from environmental samples", "Only human DNA", "Protein structures"])
+
+    answers["q8"] = st.radio("8. Which enzyme replicates DNA?",
+                            ["RNA polymerase", "DNA polymerase", "Ligase", "Helicase"])
+
+    answers["q9"] = st.radio("9. Microbiome refers to:",
+                            ["One bacterium", "All microbes in an environment", "Only pathogens", "Only viruses"])
+
+    answers["q10"] = st.radio("10. Restriction enzymes:",
+                             ["Amplify DNA", "Cut DNA at specific sites", "Join DNA", "Translate DNA"])
+
+    answers["q11"] = st.radio("11. ATP is:",
+                             ["Genetic material", "Energy currency of cell", "Protein", "Enzyme"])
+
+    answers["q12"] = st.radio("12. Which organelle produces ATP?",
+                             ["Nucleus", "Mitochondria", "Ribosome", "Golgi"])
+
+    answers["q13"] = st.radio("13. Point mutation affects:",
+                             ["Entire chromosome", "Single nucleotide", "Whole genome", "Proteins only"])
+
+    answers["q14"] = st.radio("14. Bioinformatics is used to:",
+                             ["Grow bacteria", "Analyze biological data using computers", "Extract DNA", "Perform PCR"])
+
+    answers["q15"] = st.radio("15. Gut microbiome helps in:",
+                             ["Only disease", "Digestion and health", "DNA replication", "Protein synthesis"])
+
+    # ---------------------------
+    # Submit Button
+    # ---------------------------
     if st.button("Submit Answers"):
         end_time = time.time()
         duration = round(end_time - st.session_state.start_time, 2)
 
-        score = 0
-        if q1 == "DNA": score += 1
-        if q2 == "Amplify DNA": score += 1
-        if q3 == "Gene editing": score += 1
-        if q4 == "All microbes": score += 1
-        if q5 == "Energy molecule": score += 1
+        # Correct answers
+        correct = {
+            "q1": "DNA",
+            "q2": "Amplify DNA",
+            "q3": "Gene editing",
+            "q4": "Living organisms",
+            "q5": "Produce useful products using microbes",
+            "q6": "tRNA",
+            "q7": "DNA from environmental samples",
+            "q8": "DNA polymerase",
+            "q9": "All microbes in an environment",
+            "q10": "Cut DNA at specific sites",
+            "q11": "Energy currency of cell",
+            "q12": "Mitochondria",
+            "q13": "Single nucleotide",
+            "q14": "Analyze biological data using computers",
+            "q15": "Digestion and health"
+        }
 
-        # Save result
+        score = sum([1 for k in correct if answers[k] == correct[k]])
+
         df = load_data()
         new_entry = pd.DataFrame([[name, score, duration]],
                                  columns=["Name", "Score", "Time"])
@@ -73,7 +126,7 @@ if st.session_state.start_time and not st.session_state.submitted:
 
         st.session_state.submitted = True
 
-        st.success(f"✅ Submitted! Score: {score}/5 | Time: {duration} sec")
+        st.success(f"✅ Submitted! Score: {score}/15 | Time: {duration} sec")
 
 # ---------------------------
 # Leaderboard
