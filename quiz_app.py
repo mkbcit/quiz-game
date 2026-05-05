@@ -140,4 +140,17 @@ if not df.empty:
     st.dataframe(df_sorted.head(10))
 else:
     st.write("No results yet.")
-st.subheader(" cc by MK Biswas")
+
+
+st.markdown("---")
+
+col1, col2, col3 = st.columns([1,2,1])
+
+with col2:
+    st.markdown(
+        "<div style='text-align: center; font-size: 14px;'>"
+        "Developed by <b>MK Biswas</b> 🧬<br>"
+        "Biology Quiz Platform"
+        "</div>",
+        unsafe_allow_html=True
+    )
