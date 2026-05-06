@@ -137,7 +137,7 @@ df = load_data()
 
 if not df.empty:
     df_sorted = df.sort_values(by=["Score", "Time"], ascending=[False, True])
-    st.dataframe(df_sorted.head(100))
+    st.dataframe(df_sorted.head(1000))
 else:
     st.write("No results yet.")
 
