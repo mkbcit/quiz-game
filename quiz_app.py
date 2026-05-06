@@ -129,18 +129,49 @@ if st.session_state.start_time and not st.session_state.submitted:
         st.success(f"✅ Submitted! Score: {score}/15 | Time: {duration} sec")
 
 # ---------------------------
-# Leaderboard
+# Leaderboard (Improved)
 # ---------------------------
 st.subheader("🏆 Leaderboard")
 
 df = load_data()
 
 if not df.empty:
-    df_sorted = df.sort_values(by=["Score", "Time"], ascending=[False, True])
-    st.dataframe(df_sorted.head(1000))
-else:
-    st.write("No results yet.")
 
+    # Normalize time (lower is better)
+    df["Time_norm"] = df["Time"] / df["Time"].max()
+
+    # Combined performance metric
+    df["Performance"] = df["Score"] - df["Time_norm"]
+
+    # Sort: best score first, then fastest time
+    df_sorted = df.sort_values(
+        by=["Score", "Time"],
+        ascending=[False, True]
+    ).reset_index(drop=True)
+
+    # Add ranking
+    df_sorted["Rank"] = df_sorted.index + 1
+
+    # Medal icons
+    def medal(rank):
+        if rank == 1:
+            return "🥇"
+        elif rank == 2:
+            return "🥈"
+        elif rank == 3:
+            return "🥉"
+        return ""
+
+    df_sorted["🏅"] = df_sorted["Rank"].apply(medal)
+
+    # Final display columns
+    df_sorted = df_sorted[["Rank", "🏅", "Name", "Score", "Time"]]
+
+    # Show everything in one page
+    st.dataframe(df_sorted, use_container_width=True, height=600)
+
+else:
+    st.info("No results yet.")
 
 st.markdown("---")
 
