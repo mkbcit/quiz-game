@@ -9,9 +9,8 @@ from email.mime.multipart import MIMEMultipart
 # =============================================================================
 # 👤 DEVELOPER / AUTHOR IDENTIFICATION & AFFILIATION
 # =============================================================================
-# Replace these values with your details!
 AUTHOR_NAME = "Your Name"                # e.g., "Manosh Biswas, PhD"
-AUTHOR_TITLE = "Your Position/Title"    # e.g., "Assistant Professor" or "Botany Student"
+AUTHOR_TITLE = "Your Position/Title"    # e.g., "Assistant Professor"
 AUTHOR_AFFILIATION = "Your Department / Institution"  # e.g., "Department of Botany, Rajshahi University"
 
 # ---------------------------
@@ -175,7 +174,7 @@ def send_feedback_email(recipient_email, user_name, score, duration, user_answer
         q_text = item["question"]
         user_ans = user_answers.get(item["id"], "Not Answered")
         correct_ans = item["correct"]
-        is_correct = user_ans == correct_ans
+        is_correct = (user_ans == correct_ans)
 
         status = "✅ Correct" if is_correct else "❌ Incorrect"
         color = "#28a745" if is_correct else "#dc3545"
@@ -189,7 +188,7 @@ def send_feedback_email(recipient_email, user_name, score, duration, user_answer
         </tr>
         """
 
-    html_body = f"""
+    html_template = """
     <html>
     <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
         <h2>🌿 RU Botany Challenge - Performance Report</h2>
@@ -205,4 +204,237 @@ def send_feedback_email(recipient_email, user_name, score, duration, user_answer
         <h3>Detailed Feedback & Answer Key</h3>
         <table style="width: 100%; border-collapse: collapse; text-align: left;">
             <thead>
-                <tr style
+                <tr style="background-color: #28a745; color: white;">
+                    <th style="padding: 10px;">Question</th>
+                    <th style="padding: 10px;">Your Answer</th>
+                    <th style="padding: 10px;">Correct Answer</th>
+                    <th style="padding: 10px;">Result</th>
+                </tr>
+            </thead>
+            <tbody>
+                {feedback_rows}
+            </tbody>
+        </table>
+
+        <br>
+        <hr>
+        <p style="font-size: 12px; color: #6c757d;">
+            RU Botany Challenge | Created by {author_name} ({author_affiliation})
+        </p>
+    </body>
+    </html>
+    """
+
+    html_body = html_template.format(
+        user_name=user_name,
+        score=score,
+        duration=duration,
+        feedback_rows=feedback_rows,
+        author_name=AUTHOR_NAME,
+        author_affiliation=AUTHOR_AFFILIATION
+    )
+
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["From"] = SENDER_EMAIL
+        msg["To"] = recipient_email
+        msg["Subject"] = subject
+        msg.attach(MIMEText(html_body, "html"))
+
+        with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as server:
+            server.login(SENDER_EMAIL, SENDER_PASSWORD)
+            server.send_message(msg)
+        return True
+    except Exception as e:
+        st.error(f"Error sending email: {e}")
+        return False
+
+
+def is_valid_email(email):
+    regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+    return re.match(regex, email) is not None
+
+
+# ---------------------------
+# Session State Initialization
+# ---------------------------
+if "quiz_started" not in st.session_state:
+    st.session_state.quiz_started = False
+if "submitted" not in st.session_state:
+    st.session_state.submitted = False
+if "start_time" not in st.session_state:
+    st.session_state.start_time = None
+if "user_name" not in st.session_state:
+    st.session_state.user_name = ""
+if "user_email" not in st.session_state:
+    st.session_state.user_email = ""
+if "score" not in st.session_state:
+    st.session_state.score = 0
+if "duration" not in st.session_state:
+    st.session_state.duration = 0
+if "user_answers" not in st.session_state:
+    st.session_state.user_answers = {}
+
+# ---------------------------
+# UI Page Header
+# ---------------------------
+st.title("🌿 RU Botany Challenge")
+
+# ---------------------------
+# Step 1: Participant Registration
+# ---------------------------
+if not st.session_state.quiz_started:
+    st.subheader("📋 Participant Registration")
+    st.write("Please enter your details to start the quiz. Results will be emailed to you and added to the leaderboard.")
+
+    with st.form("login_form"):
+        name_input = st.text_input("Full Name / Student ID *")
+        email_input = st.text_input("Email Address *")
+        start_btn = st.form_submit_button("Start Quiz 🚀")
+
+        if start_btn:
+            if not name_input.strip():
+                st.error("Name is required!")
+            elif not email_input.strip():
+                st.error("Email is required!")
+            elif not is_valid_email(email_input.strip()):
+                st.error("Please enter a valid email address!")
+            else:
+                st.session_state.user_name = name_input.strip()
+                st.session_state.user_email = email_input.strip()
+                st.session_state.start_time = time.time()
+                st.session_state.quiz_started = True
+                st.rerun()
+
+# ---------------------------
+# Step 2: Quiz Questions
+# ---------------------------
+elif st.session_state.quiz_started and not st.session_state.submitted:
+    st.info(f"Participant: **{st.session_state.user_name}** ({st.session_state.user_email})")
+    st.subheader("Answer all 20 questions:")
+
+    user_answers = {}
+    for item in QUIZ_DATA:
+        user_answers[item["id"]] = st.radio(
+            item["question"], 
+            item["options"], 
+            key=item["id"]
+        )
+
+    if st.button("Submit Answers"):
+        end_time = time.time()
+        st.session_state.duration = round(end_time - st.session_state.start_time, 2)
+        st.session_state.user_answers = user_answers
+
+        # Calculate score
+        st.session_state.score = sum(
+            [1 for item in QUIZ_DATA if user_answers.get(item["id"]) == item["correct"]]
+        )
+
+        # Save result to CSV for leaderboard
+        df = load_data()
+        new_entry = pd.DataFrame(
+            [[st.session_state.user_name, st.session_state.user_email, st.session_state.score, st.session_state.duration]],
+            columns=["Name", "Email", "Score", "Time"]
+        )
+        df = pd.concat([df, new_entry], ignore_index=True)
+        save_data(df)
+
+        # Dispatch detailed email feedback
+        email_sent = send_feedback_email(
+            recipient_email=st.session_state.user_email,
+            user_name=st.session_state.user_name,
+            score=st.session_state.score,
+            duration=st.session_state.duration,
+            user_answers=user_answers
+        )
+
+        st.session_state.submitted = True
+        st.session_state.email_sent = email_sent
+        st.rerun()
+
+# ---------------------------
+# Step 3: Immediate Feedback
+# ---------------------------
+elif st.session_state.submitted:
+    st.success(
+        f"✅ Quiz Submitted! Score: **{st.session_state.score} / 20** | "
+        f"Time Taken: **{st.session_state.duration} seconds**"
+    )
+
+    if getattr(st.session_state, "email_sent", False):
+        st.info(f"📧 A detailed result report has been sent to **{st.session_state.user_email}**.")
+    else:
+        st.warning("⚠️ Could not send the email automatically. Check your server SMTP credentials.")
+
+    st.subheader("📊 Your Answer Feedback")
+
+    for item in QUIZ_DATA:
+        q_id = item["id"]
+        q_text = item["question"]
+        user_ans = st.session_state.user_answers.get(q_id, "Not Answered")
+        correct_ans = item["correct"]
+
+        if user_ans == correct_ans:
+            st.markdown(f"**{q_text}**")
+            st.success(f"Your Answer: {user_ans} (Correct)")
+        else:
+            st.markdown(f"**{q_text}**")
+            st.error(f"Your Answer: {user_ans} | Correct Answer: {correct_ans}")
+
+    if st.button("Take Quiz Again 🔄"):
+        st.session_state.quiz_started = False
+        st.session_state.submitted = False
+        st.rerun()
+
+# ---------------------------
+# Leaderboard Table
+# ---------------------------
+st.markdown("---")
+st.subheader("🏆 Leaderboard")
+
+df_results = load_data()
+
+if not df_results.empty:
+    # Sort by highest score first, then by fastest time taken
+    df_sorted = df_results.sort_values(
+        by=["Score", "Time"],
+        ascending=[False, True]
+    ).reset_index(drop=True)
+
+    df_sorted["Rank"] = df_sorted.index + 1
+
+    def medal(rank):
+        if rank == 1:
+            return "🥇"
+        elif rank == 2:
+            return "🥈"
+        elif rank == 3:
+            return "🥉"
+        return ""
+
+    df_sorted["🏅"] = df_sorted["Rank"].apply(medal)
+
+    # Rename columns for clear display in table
+    df_display = df_sorted[["Rank", "🏅", "Name", "Email", "Score", "Time"]]
+    df_display.columns = ["Rank", "Medal", "Participant Name", "Email Address", "Score (out of 20)", "Time Taken (sec)"]
+
+    st.dataframe(df_display, use_container_width=True, height=400)
+else:
+    st.info("No participants on the leaderboard yet. Be the first!")
+
+# ---------------------------
+# Footer / Author Attribution
+# ---------------------------
+st.markdown("---")
+st.markdown(
+    f"""
+    <div style='text-align: center; font-size: 14px;'>
+        🌿 <b>RU Botany Challenge</b> Platform <br>
+        Developed & Maintained by <b>{AUTHOR_NAME}</b> <br>
+        <i>{AUTHOR_TITLE}</i> <br>
+        {AUTHOR_AFFILIATION}
+    </div>
+    """,
+    unsafe_allow_html=True
+)
