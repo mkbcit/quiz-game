@@ -9,9 +9,9 @@ from email.mime.multipart import MIMEMultipart
 # =============================================================================
 # 👤 DEVELOPER / AUTHOR IDENTIFICATION & AFFILIATION
 # =============================================================================
-AUTHOR_NAME = "Your Name"                # e.g., "Manosh Biswas, PhD"
-AUTHOR_TITLE = "Your Position/Title"    # e.g., "Assistant Professor"
-AUTHOR_AFFILIATION = "Your Department / Institution"  # e.g., "Department of Botany, Rajshahi University"
+AUTHOR_NAME = "Manosh Biswas, PhD"                # e.g., "Manosh Biswas, PhD"
+AUTHOR_TITLE = "Assistant Professor Computational Biology "    # e.g., "Assistant Professor"
+AUTHOR_AFFILIATION = " AGC UM6P"  # e.g., "  Assistant Professor Computational Biology AGC UM6P sity"
 
 # ---------------------------
 # Email Credentials & Configuration
