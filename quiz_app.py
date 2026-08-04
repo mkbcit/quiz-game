@@ -1,188 +1,362 @@
 import streamlit as st
-import pandas as pd
 import time
+import re
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # ---------------------------
-# Session state
+# Email Credentials & Configuration
 # ---------------------------
-if "start_time" not in st.session_state:
-    st.session_state.start_time = None
+# Replace these credentials with your actual SMTP details or use st.secrets
+SENDER_EMAIL = "your_email@gmail.com"
+SENDER_PASSWORD = "your_app_password"  # Use an App Password (for Gmail)
+SMTP_SERVER = "smtp.gmail.com"
+SMTP_PORT = 465
+
+# ---------------------------
+# Quiz Dataset & Answer Key
+# ---------------------------
+QUIZ_DATA = [
+    {
+        "id": "q1",
+        "question": "1. Which organelle is known as the site of photosynthesis in plant cells?",
+        "options": ["Mitochondria", "Chloroplast", "Golgi Body", "Endoplasmic Reticulum"],
+        "correct": "Chloroplast"
+    },
+    {
+        "id": "q2",
+        "question": "2. Which vascular tissue is responsible for transporting water and minerals?",
+        "options": ["Phloem", "Xylem", "Cortex", "Pith"],
+        "correct": "Xylem"
+    },
+    {
+        "id": "q3",
+        "question": "3. What is the primary component of plant cell walls?",
+        "options": ["Chitin", "Peptidoglycan", "Cellulose", "Keratin"],
+        "correct": "Cellulose"
+    },
+    {
+        "id": "q4",
+        "question": "4. Which plant hormone is primarily responsible for stem elongation?",
+        "options": ["Auxin", "Abscisic Acid", "Ethylene", "Cytokinin"],
+        "correct": "Auxin"
+    },
+    {
+        "id": "q5",
+        "question": "5. Double fertilization is a characteristic feature of which group?",
+        "options": ["Bryophytes", "Pteridophytes", "Gymnosperms", "Angiosperms"],
+        "correct": "Angiosperms"
+    },
+    {
+        "id": "q6",
+        "question": "6. Which light spectrum is most effective for photosynthesis?",
+        "options": ["Green and Yellow", "Blue and Red", "UV and Infrared", "Orange and Green"],
+        "correct": "Blue and Red"
+    },
+    {
+        "id": "q7",
+        "question": "7. Stomata opening and closing is directly controlled by:",
+        "options": ["Epidermal cells", "Guard cells", "Companion cells", "Mesophyll cells"],
+        "correct": "Guard cells"
+    },
+    {
+        "id": "q8",
+        "question": "8. Which gas is released as a byproduct during the light reactions?",
+        "options": ["Carbon Dioxide", "Oxygen", "Nitrogen", "Methane"],
+        "correct": "Oxygen"
+    },
+    {
+        "id": "q9",
+        "question": "9. Pteridophytes are commonly known as:",
+        "options": ["Flowering plants", "Vascular cryptogams", "Non-vascular plants", "Naked seed plants"],
+        "correct": "Vascular cryptogams"
+    },
+    {
+        "id": "q10",
+        "question": "10. The study of fungi is known as:",
+        "options": ["Phycology", "Mycology", "Bryology", "Paleobotany"],
+        "correct": "Mycology"
+    },
+    {
+        "id": "q11",
+        "question": "11. In DNA structure, Adenine pairs with:",
+        "options": ["Guanine", "Cytosine", "Thymine", "Uracil"],
+        "correct": "Thymine"
+    },
+    {
+        "id": "q12",
+        "question": "12. Which type of RNA carries amino acids during protein synthesis?",
+        "options": ["mRNA", "tRNA", "rRNA", "snRNA"],
+        "correct": "tRNA"
+    },
+    {
+        "id": "q13",
+        "question": "13. Naked seeds (unenclosed inside a fruit) are characteristic of:",
+        "options": ["Bryophytes", "Angiosperms", "Gymnosperms", "Algae"],
+        "correct": "Gymnosperms"
+    },
+    {
+        "id": "q14",
+        "question": "14. Which enzyme is responsible for fixing carbon dioxide in C3 plants?",
+        "options": ["PEP carboxylase", "RuBisCO", "ATP synthase", "DNA polymerase"],
+        "correct": "RuBisCO"
+    },
+    {
+        "id": "q15",
+        "question": "15. A symbiotic relationship between algae and fungi is called a:",
+        "options": ["Mycorrhiza", "Lichen", "Rhizobium", "Moss"],
+        "correct": "Lichen"
+    },
+    {
+        "id": "q16",
+        "question": "16. Water loss in the form of vapor through stomata is termed:",
+        "options": ["Guttation", "Transpiration", "Osmosis", "Imbibition"],
+        "correct": "Transpiration"
+    },
+    {
+        "id": "q17",
+        "question": "17. Which molecule serves as the main cellular energy currency?",
+        "options": ["NADPH", "Glucose", "ATP", "Pyruvate"],
+        "correct": "ATP"
+    },
+    {
+        "id": "q18",
+        "question": "18. In which year was the University of Rajshahi established?",
+        "options": ["1921", "1952", "1953", "1971"],
+        "correct": "1953"
+    },
+    {
+        "id": "q19",
+        "question": "19. Who was the founding Vice-Chancellor of Rajshahi University?",
+        "options": ["Dr. Itrat Husain Zuberi", "Dr. Shamsuzzoha", "Prof. Mazharul Islam", "Dr. Muhammad Shahidullah"],
+        "correct": "Dr. Itrat Husain Zuberi"
+    },
+    {
+        "id": "q20",
+        "question": "20. Which monument in RU commemorates the 1969 Uprising and 1971 Liberation War?",
+        "options": ["Shabash Bangladesh", "Aparajeyo Bangla", "National Martyrs' Monument", "Central Shaheed Minar"],
+        "correct": "Shabash Bangladesh"
+    }
+]
+
+# ---------------------------
+# Email Sender Function
+# ---------------------------
+def send_feedback_email(recipient_email, user_name, score, duration, user_answers):
+    """Sends an HTML formatted email feedback containing full question breakdown."""
+    subject = "Your Botany & RU History Quiz Results and Answer Key 🌿"
+
+    # Build detailed HTML feedback table
+    feedback_rows = ""
+    for idx, item in enumerate(QUIZ_DATA, 1):
+        q_text = item["question"]
+        user_ans = user_answers.get(item["id"], "Not Answered")
+        correct_ans = item["correct"]
+        is_correct = user_ans == correct_ans
+
+        status = "✅ Correct" if is_correct else "❌ Incorrect"
+        color = "#28a745" if is_correct else "#dc3545"
+
+        feedback_rows += f"""
+        <tr style="border-bottom: 1px solid #ddd;">
+            <td style="padding: 10px;"><b>{q_text}</b></td>
+            <td style="padding: 10px; color: {color};"><b>{user_ans}</b></td>
+            <td style="padding: 10px; color: #28a745;"><b>{correct_ans}</b></td>
+            <td style="padding: 10px; color: {color};"><b>{status}</b></td>
+        </tr>
+        """
+
+    html_body = f"""
+    <html>
+    <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <h2>🌿 Botany & RU History Challenge - Performance Report</h2>
+        <p>Dear <b>{user_name}</b>,</p>
+        <p>Thank you for completing the quiz! Here is your performance summary:</p>
+        
+        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #e9ecef; margin-bottom: 20px;">
+            <p style="margin: 5px 0;"><b>Participant Name:</b> {user_name}</p>
+            <p style="margin: 5px 0;"><b>Final Score:</b> {score} / 20</p>
+            <p style="margin: 5px 0;"><b>Time Elapsed:</b> {duration} seconds</p>
+        </div>
+
+        <h3>Detailed Feedback & Answer Key</h3>
+        <table style="width: 100%; border-collapse: collapse; text-align: left;">
+            <thead>
+                <tr style="background-color: #007bff; color: white;">
+                    <th style="padding: 10px;">Question</th>
+                    <th style="padding: 10px;">Your Answer</th>
+                    <th style="padding: 10px;">Correct Answer</th>
+                    <th style="padding: 10px;">Result</th>
+                </tr>
+            </thead>
+            <tbody>
+                {feedback_rows}
+            </tbody>
+        </table>
+
+        <br>
+        <hr>
+        <p style="font-size: 12px; color: #6c757d;">
+            Botany Quiz Platform | Rajshahi University
+        </p>
+    </body>
+    </html>
+    """
+
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["From"] = SENDER_EMAIL
+        msg["To"] = recipient_email
+        msg["Subject"] = subject
+
+        msg.attach(MIMEText(html_body, "html"))
+
+        with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as server:
+            server.login(SENDER_EMAIL, SENDER_PASSWORD)
+            server.send_message(msg)
+        return True
+    except Exception as e:
+        st.error(f"Error sending email: {e}")
+        return False
+
+
+def is_valid_email(email):
+    regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+    return re.match(regex, email) is not None
+
+
+# ---------------------------
+# Session State Initialization
+# ---------------------------
+if "quiz_started" not in st.session_state:
+    st.session_state.quiz_started = False
 if "submitted" not in st.session_state:
     st.session_state.submitted = False
-
-FILE = "results.csv"
-
-def load_data():
-    try:
-        return pd.read_csv(FILE)
-    except:
-        return pd.DataFrame(columns=["Name", "Score", "Time"])
-
-def save_data(df):
-    df.to_csv(FILE, index=False)
-
-# ---------------------------
-# Title
-# ---------------------------
-st.title("🧬 Genomics & Metagenomics Challenge for AGC Member")
-st.write("Answer all questions. Highest score + fastest time wins! 🏆")
+if "start_time" not in st.session_state:
+    st.session_state.start_time = None
+if "user_name" not in st.session_state:
+    st.session_state.user_name = ""
+if "user_email" not in st.session_state:
+    st.session_state.user_email = ""
+if "score" not in st.session_state:
+    st.session_state.score = 0
+if "duration" not in st.session_state:
+    st.session_state.duration = 0
+if "user_answers" not in st.session_state:
+    st.session_state.user_answers = {}
 
 # ---------------------------
-# Name input
+# UI Page Header
 # ---------------------------
-name = st.text_input("Enter your Name / ID")
-
-if st.button("Start Quiz 🚀") and name:
-    st.session_state.start_time = time.time()
-    st.session_state.submitted = False
+st.title("🌿 Botany & RU History Challenge")
 
 # ---------------------------
-# Quiz Section
+# Step 1: Participant Form
 # ---------------------------
-if st.session_state.start_time and not st.session_state.submitted:
+if not st.session_state.quiz_started:
+    st.subheader("📋 Participant Registration")
+    st.write("Please provide your name and email to receive your detailed test result.")
 
-    st.subheader("Answer all questions:")
+    with st.form("login_form"):
+        name_input = st.text_input("Full Name / Student ID *")
+        email_input = st.text_input("Email Address *")
+        start_btn = st.form_submit_button("Start Quiz 🚀")
 
-    answers = {}
+        if start_btn:
+            if not name_input.strip():
+                st.error("Name is required!")
+            elif not email_input.strip():
+                st.error("Email is required!")
+            elif not is_valid_email(email_input.strip()):
+                st.error("Please enter a valid email address!")
+            else:
+                st.session_state.user_name = name_input.strip()
+                st.session_state.user_email = email_input.strip()
+                st.session_state.start_time = time.time()
+                st.session_state.quiz_started = True
+                st.rerun()
 
-    answers["q1"] = st.radio("1. Which molecule carries genetic information?",
-                            ["RNA", "DNA", "Protein", "Lipid"])
+# ---------------------------
+# Step 2: Quiz Questions
+# ---------------------------
+elif st.session_state.quiz_started and not st.session_state.submitted:
+    st.info(f"Participant: **{st.session_state.user_name}** ({st.session_state.user_email})")
+    st.subheader("Answer all 20 questions:")
 
-    answers["q2"] = st.radio("2. PCR is used to:",
-                            ["Sequence DNA", "Amplify DNA", "Cut DNA", "Store DNA"])
+    user_answers = {}
+    for item in QUIZ_DATA:
+        user_answers[item["id"]] = st.radio(
+            item["question"], 
+            item["options"], 
+            key=item["id"]
+        )
 
-    answers["q3"] = st.radio("3. CRISPR-Cas9 is used for:",
-                            ["DNA extraction", "Gene editing", "Protein synthesis", "Sequencing"])
-
-    answers["q4"] = st.radio("4. Natural products are produced by:",
-                            ["Only synthetic processes", "Living organisms", "Only plants", "Only bacteria"])
-
-    answers["q5"] = st.radio("5. Fermentation is used to:",
-                            ["Produce useful products using microbes", "Destroy DNA", "Sequence proteins", "Measure pH"])
-
-    answers["q6"] = st.radio("6. Which RNA carries amino acids?",
-                            ["mRNA", "tRNA", "rRNA", "snRNA"])
-
-    answers["q7"] = st.radio("7. Metagenomics studies:",
-                            ["Single organisms", "DNA from environmental samples", "Only human DNA", "Protein structures"])
-
-    answers["q8"] = st.radio("8. Which enzyme replicates DNA?",
-                            ["RNA polymerase", "DNA polymerase", "Ligase", "Helicase"])
-
-    answers["q9"] = st.radio("9. Microbiome refers to:",
-                            ["One bacterium", "All microbes in an environment", "Only pathogens", "Only viruses"])
-
-    answers["q10"] = st.radio("10. Restriction enzymes:",
-                             ["Amplify DNA", "Cut DNA at specific sites", "Join DNA", "Translate DNA"])
-
-    answers["q11"] = st.radio("11. ATP is:",
-                             ["Genetic material", "Energy currency of cell", "Protein", "Enzyme"])
-
-    answers["q12"] = st.radio("12. Which organelle produces ATP?",
-                             ["Nucleus", "Mitochondria", "Ribosome", "Golgi"])
-
-    answers["q13"] = st.radio("13. Point mutation affects:",
-                             ["Entire chromosome", "Single nucleotide", "Whole genome", "Proteins only"])
-
-    answers["q14"] = st.radio("14. Bioinformatics is used to:",
-                             ["Grow bacteria", "Analyze biological data using computers", "Extract DNA", "Perform PCR"])
-
-    answers["q15"] = st.radio("15. Gut microbiome helps in:",
-                             ["Only disease", "Digestion and health", "DNA replication", "Protein synthesis"])
-
-    # ---------------------------
-    # Submit Button
-    # ---------------------------
     if st.button("Submit Answers"):
         end_time = time.time()
-        duration = round(end_time - st.session_state.start_time, 2)
+        st.session_state.duration = round(end_time - st.session_state.start_time, 2)
+        st.session_state.user_answers = user_answers
 
-        # Correct answers
-        correct = {
-            "q1": "DNA",
-            "q2": "Amplify DNA",
-            "q3": "Gene editing",
-            "q4": "Living organisms",
-            "q5": "Produce useful products using microbes",
-            "q6": "tRNA",
-            "q7": "DNA from environmental samples",
-            "q8": "DNA polymerase",
-            "q9": "All microbes in an environment",
-            "q10": "Cut DNA at specific sites",
-            "q11": "Energy currency of cell",
-            "q12": "Mitochondria",
-            "q13": "Single nucleotide",
-            "q14": "Analyze biological data using computers",
-            "q15": "Digestion and health"
-        }
+        # Calculate score
+        st.session_state.score = sum(
+            [1 for item in QUIZ_DATA if user_answers.get(item["id"]) == item["correct"]]
+        )
 
-        score = sum([1 for k in correct if answers[k] == correct[k]])
-
-        df = load_data()
-        new_entry = pd.DataFrame([[name, score, duration]],
-                                 columns=["Name", "Score", "Time"])
-        df = pd.concat([df, new_entry], ignore_index=True)
-        save_data(df)
+        # Dispatch feedback via email
+        email_sent = send_feedback_email(
+            recipient_email=st.session_state.user_email,
+            user_name=st.session_state.user_name,
+            score=st.session_state.score,
+            duration=st.session_state.duration,
+            user_answers=user_answers
+        )
 
         st.session_state.submitted = True
-
-        st.success(f"✅ Submitted! Score: {score}/15 | Time: {duration} sec")
+        st.session_state.email_sent = email_sent
+        st.rerun()
 
 # ---------------------------
-# Leaderboard (Improved)
+# Step 3: Immediate Results & On-Screen Feedback
 # ---------------------------
-st.subheader("🏆 Leaderboard")
-
-df = load_data()
-
-if not df.empty:
-
-    # Normalize time (lower is better)
-    df["Time_norm"] = df["Time"] / df["Time"].max()
-
-    # Combined performance metric
-    df["Performance"] = df["Score"] - df["Time_norm"]
-
-    # Sort: best score first, then fastest time
-    df_sorted = df.sort_values(
-        by=["Score", "Time"],
-        ascending=[False, True]
-    ).reset_index(drop=True)
-
-    # Add ranking
-    df_sorted["Rank"] = df_sorted.index + 1
-
-    # Medal icons
-    def medal(rank):
-        if rank == 1:
-            return "🥇"
-        elif rank == 2:
-            return "🥈"
-        elif rank == 3:
-            return "🥉"
-        return ""
-
-    df_sorted["🏅"] = df_sorted["Rank"].apply(medal)
-
-    # Final display columns
-    df_sorted = df_sorted[["Rank", "🏅", "Name", "Score", "Time"]]
-
-    # Show everything in one page
-    st.dataframe(df_sorted, use_container_width=True, height=600)
-
-else:
-    st.info("No results yet.")
-
-st.markdown("---")
-
-col1, col2, col3 = st.columns([1,2,1])
-
-with col2:
-    st.markdown(
-        "<div style='text-align: center; font-size: 14px;'>"
-        "🧬 Biology Quiz Platform <br> Developed by <b>Manosh Biswas, PhD</b> <br> Assistant Professor<br>Computational Biology Lab <br> AGC UM6P "
-        "</div>",
-        unsafe_allow_html=True
+elif st.session_state.submitted:
+    st.success(
+        f"✅ Quiz Submitted! Score: **{st.session_state.score} / 20** | "
+        f"Time Taken: **{st.session_state.duration} seconds**"
     )
 
- 
+    if getattr(st.session_state, "email_sent", False):
+        st.info(f"📧 A detailed answer key and feedback report was sent to **{st.session_state.user_email}**.")
+    else:
+        st.warning("⚠️ Could not send the email automatically. Check your server SMTP credentials.")
+
+    st.subheader("📊 Your Answer Feedback")
+
+    for item in QUIZ_DATA:
+        q_id = item["id"]
+        q_text = item["question"]
+        user_ans = st.session_state.user_answers.get(q_id, "Not Answered")
+        correct_ans = item["correct"]
+
+        if user_ans == correct_ans:
+            st.markdown(f"**{q_text}**")
+            st.success(f"Your Answer: {user_ans} (Correct)")
+        else:
+            st.markdown(f"**{q_text}**")
+            st.error(f"Your Answer: {user_ans} | Correct Answer: {correct_ans}")
+
+    if st.button("Take Quiz Again 🔄"):
+        st.session_state.quiz_started = False
+        st.session_state.submitted = False
+        st.rerun()
+
+# ---------------------------
+# Footer
+# ---------------------------
+st.markdown("---")
+st.markdown(
+    "<div style='text-align: center; font-size: 14px;'>"
+    "🧬 <b>Botany & Biology Quiz Platform</b> <br>"
+    "Developed for <b>Rajshahi University</b> Students"
+    "</div>",
+    unsafe_allow_html=True
+)
